@@ -21,3 +21,12 @@ footer { color: #777; font-size: 13px; }
 @keyframes spin { to { transform: rotate(360deg); } }
 .empty { color: #666; }
 footer code { font-size: 12px; }
+.confirm { position: fixed; inset: 0; background: rgba(0,0,0,.35); display: grid; place-items: center; z-index: 5; }
+.confirm[hidden] { display: none; }
+.confirm-card { background: #fff; border-radius: 10px; padding: 18px 22px; min-width: 320px; max-width: 90vw; box-shadow: 0 10px 30px rgba(0,0,0,.25); }
+.confirm-text { margin: 0 0 14px; font-size: 17px; }
+.confirm-text .cid { font-family: ui-monospace, monospace; font-size: 20px; }
+.confirm-text .cwhat { color: #555; font-size: 14px; }
+.confirm-actions { display: flex; gap: 10px; justify-content: flex-end; }
+.confirm-actions button { font: inherit; padding: 6px 14px; border: 1px solid #1d1d1f; border-radius: 6px; background: #fff; cursor: pointer; }
+.confirm-actions .primary { background: #1d1d1f; color: #fff; }
