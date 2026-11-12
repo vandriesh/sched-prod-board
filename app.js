@@ -41,7 +41,7 @@ function makeRow(i) {
     <span class="what">${esc(i.service)} · ${esc(i.region)} · ${esc(i.summary)}</span>
     <time datetime="${esc(i.openedAt)}" title="${esc(i.openedAt)}">${esc(localTime(i.openedAt))}</time>
     <span class="act"><button type="button" data-testid="ack">Ack</button></span>`;
-  li.querySelector('[data-testid="ack"]').addEventListener('click', () => onAck(i.id, li));
+  li.querySelector('[data-testid="ack"]').addEventListener('click', () => askAck(i.id, li));
   return li;
 }
 
@@ -51,6 +51,39 @@ function markAcked(li, reply) {
   act.innerHTML = `<span data-testid="acked" class="acked">✓ acked${esc(t)}</span>`;
   li.classList.add('is-acked');
 }
+
+// Product's decision (after step 1): Ack asks to confirm, and the confirm names the incident id,
+// so a row that moved under the pointer cannot be acked by mistake.
+const confirmBox = document.querySelector('[data-testid="confirm"]');
+const confirmText = confirmBox.querySelector('.confirm-text');
+const confirmAck = confirmBox.querySelector('[data-testid="confirm-ack"]');
+const confirmCancel = confirmBox.querySelector('[data-testid="confirm-cancel"]');
+let pending = null; // { id, li }
+
+function askAck(id, li) {
+  if (acked.has(id)) return;
+  const what = li.querySelector('.what').textContent;
+  pending = { id, li };
+  confirmText.innerHTML = `Ack <strong class="cid">${esc(id)}</strong>?<br><span class="cwhat">${esc(what)}</span>`;
+  confirmAck.textContent = `Ack ${id}`;
+  confirmBox.hidden = false;
+  confirmAck.focus();
+}
+
+function closeConfirm() {
+  confirmBox.hidden = true;
+  pending = null;
+}
+
+confirmCancel.addEventListener('click', closeConfirm);
+confirmBox.addEventListener('click', (e) => { if (e.target === confirmBox) closeConfirm(); });
+document.addEventListener('keydown', (e) => { if (e.key === 'Escape' && !confirmBox.hidden) closeConfirm(); });
+confirmAck.addEventListener('click', () => {
+  if (!pending) return;
+  const { id, li } = pending;
+  closeConfirm();
+  onAck(id, li);
+});
 
 async function onAck(id, li) {
   if (acked.has(id)) return;
@@ -68,17 +101,14 @@ async function onAck(id, li) {
   }
 }
 
+const known = new Map(); // id -> incident, every incident seen since the board opened
+
 function render(incidents) {
-  // Newest first, whatever order the API sends (R1).
-  const sorted = [...incidents].sort((a, b) => Date.parse(b.openedAt) - Date.parse(a.openedAt));
-  const live = new Set(sorted.map((i) => i.id));
-  for (const [id, li] of rows) {
-    if (!live.has(id)) {
-      li.remove();
-      rows.delete(id);
-    }
-  }
-  // Put rows in order; existing rows are moved, not rebuilt. New ones land on top.
+  for (const i of incidents) known.set(i.id, i);
+  // Newest first, whatever order the API sends (R1). Rows are never taken off while the board is open,
+  // so an incident on-call is looking at does not vanish under them.
+  const sorted = [...known.values()].sort((a, b) => Date.parse(b.openedAt) - Date.parse(a.openedAt));
+  // Existing rows are moved, not rebuilt, so an acked mark is never lost. New ones land on top.
   let prev = null;
   for (const i of sorted) {
     let li = rows.get(i.id);
@@ -92,8 +122,8 @@ function render(incidents) {
     if (li !== want) list.insertBefore(li, want);
     prev = li;
   }
-  empty.hidden = sorted.length > 0;
-  list.hidden = sorted.length === 0;
+  empty.hidden = rows.size > 0;
+  list.hidden = rows.size === 0;
 }
 
 let firstLoad = true;
